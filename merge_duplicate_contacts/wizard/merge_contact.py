@@ -155,7 +155,6 @@ class MergePartnerAutomatic(models.TransientModel):
 
         where_querries = []
         group_by_querries = []
-        having_querries = []
 
         commercial_email_domains = (
             " ('aikq.de','aol.com','aol.de','arcor.de',"
@@ -180,17 +179,36 @@ class MergePartnerAutomatic(models.TransientModel):
         )
 
         # Set up parts of the querries based on selected fields here
+        # Match case would look better here but isn't a feature in our python version yet
         for field in fields:
             if field == "email":
                 group_by_querries.append("email")
-                having_querries.append("COUNT(email) > 1")
-            elif field == "domain_email":
+
+            if field == "name":
+                group_by_querries.append("name")
+
+            if field == "phone":
+                group_by_querries.append("phone")
+
+            if field == "mobile":
+                group_by_querries.append("mobile")
+
+            if field == "is_company":
+                group_by_querries.append("is_company")
+
+            if field == "vat":
+                group_by_querries.append("vat")
+
+            if field == "parent_id":
+                group_by_querries.append("parent_id")
+
+            if field == "domain_email":
                 where_querries.append("substring(email from '@(.*)$') not in %s" % commercial_email_domains)
 
         # Construct the correct final querry here
         if where_querries: final_querry += (" WHERE " + " AND ".join(where_querries) )
         if group_by_querries: final_querry += (" GROUP BY " + ", ".join(group_by_querries))
-        if having_querries: final_querry += (" HAVING " + " AND ".join(having_querries))
+        if group_by_querries: final_querry += (" HAVING COUNT(*) > 1")
 
         return final_querry
 
