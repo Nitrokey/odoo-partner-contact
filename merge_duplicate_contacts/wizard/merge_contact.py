@@ -18,6 +18,7 @@ class MergePartnerAutomatic(models.TransientModel):
         "A contact not being customer", default=True
     )
     without_sales_orders = fields.Boolean(default=True)
+
     group_by_domain_email = fields.Boolean("Domain Email")
 
     group_by_phone = fields.Boolean("Phone")
@@ -150,15 +151,14 @@ class MergePartnerAutomatic(models.TransientModel):
         }
 
     def _generate_query(self, fields, maximum_group=100):
-        pass
+        final_querry = "SELECT min(id), array_agg(id) FROM res_partner "
 
-        text = [
-            "SELECT min(id), array_agg(id)",
-            "FROM res_partner",
-        ]
+        where_querries = []
+        group_by_querries = []
+        having_querries = []
 
-        sub_query = (
-            "substring(email from '@(.*)$') not in ('aikq.de','aol.com','aol.de','arcor.de',"
+        commercial_email_domains = (
+            " ('aikq.de','aol.com','aol.de','arcor.de',"
             "'bluewin.ch','compuserve.com','dismail.de','disroot.org','duck.com','email.de',"
             "'ewe.net','ewetel.net','fastmail.com','fastmail.de','fastmail.fm','fastmail.net',"
             "'free.fr','freenet.de','gmail.com','gmx.at','gmx.ch','gmx.com','gmx.de','gmx.eu',"
@@ -179,11 +179,20 @@ class MergePartnerAutomatic(models.TransientModel):
             "'yahoo.com','yahoo.de','yahoo.es','yahoo.fr','yahoo.it')"
         )
 
+        # Set up parts of the querries based on selected fields here
         for field in fields:
-            if field == "domain_email":
-                text.append("WHERE %s" % sub_query)
+            if field == "email":
+                group_by_querries.append("email")
+                having_querries.append("COUNT(email) > 1")
+            elif field == "domain_email":
+                where_querries.append("substring(email from '@(.*)$') not in %s" % commercial_email_domains)
 
-        return " ".join(text)
+        # Construct the correct final querry here
+        if where_querries: final_querry += (" WHERE " + " AND ".join(where_querries) )
+        if group_by_querries: final_querry += (" GROUP BY " + ", ".join(group_by_querries))
+        if having_querries: final_querry += (" HAVING " + " AND ".join(having_querries))
+
+        return final_querry
 
     def _process_query(self, query, ignore_occurence=True):
         """
