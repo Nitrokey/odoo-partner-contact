@@ -203,12 +203,18 @@ class MergePartnerAutomatic(models.TransientModel):
                 group_by_querries.append("parent_id")
 
             if field == "domain_email":
-                where_querries.append("substring(email from '@(.*)$') not in %s" % commercial_email_domains)
+                where_querries.append(
+                    "substring(email from '@(.*)$') not in %s"
+                    % commercial_email_domains
+                )
 
         # Construct the correct final querry here
-        if where_querries: final_querry += (" WHERE " + " AND ".join(where_querries) )
-        if group_by_querries: final_querry += (" GROUP BY " + ", ".join(group_by_querries))
-        if group_by_querries: final_querry += (" HAVING COUNT(*) > 1")
+        if where_querries:
+            final_querry += " WHERE " + " AND ".join(where_querries)
+        if group_by_querries:
+            final_querry += " GROUP BY " + ", ".join(group_by_querries)
+        if group_by_querries:
+            final_querry += " HAVING COUNT(*) > 1"
 
         return final_querry
 
