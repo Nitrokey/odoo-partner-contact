@@ -213,7 +213,6 @@ class MergePartnerAutomatic(models.TransientModel):
             final_querry += " WHERE " + " AND ".join(where_querries)
         if group_by_querries:
             final_querry += " GROUP BY " + ", ".join(group_by_querries)
-        if group_by_querries:
             final_querry += " HAVING COUNT(*) > 1"
 
         return final_querry
