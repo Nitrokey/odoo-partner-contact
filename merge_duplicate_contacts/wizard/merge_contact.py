@@ -191,7 +191,6 @@ class MergePartnerAutomatic(models.TransientModel):
             final_querry += " GROUP BY " + ", ".join(sql_fields)
             final_querry += " HAVING COUNT(*) > 1"
 
-
         return final_querry
 
     def _process_query(self, query, ignore_occurence=True):
