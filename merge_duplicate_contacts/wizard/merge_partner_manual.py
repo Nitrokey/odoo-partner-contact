@@ -527,9 +527,9 @@ class MergePartnerManualCheck(models.TransientModel):
                 if this.vat_1:
                     self._cr.execute(
                         """
-                        "UPDATE res_partner SET vat IN %s WHERE id IN %s"
-                    """,
-                        (tuple(this.vat_1), tuple(this.dst_partner_id.id)),
+                        UPDATE res_partner SET vat = %s WHERE id = %s
+                        """,
+                        (this.vat_1, this.dst_partner_id.id),
                     )
         else:
             this.dst_partner_id = this.partner_ids and this.partner_ids[1].id or False
@@ -557,9 +557,9 @@ class MergePartnerManualCheck(models.TransientModel):
                 if this.vat_2:
                     self._cr.execute(
                         """
-                        UPDATE res_partner SET vat IN %s WHERE id IN %s
+                        UPDATE res_partner SET vat = %s WHERE id = %s
                         """,
-                        (tuple(this.vat_2), tuple(this.dst_partner_id.id)),
+                        (this.vat_2, this.dst_partner_id.id),
                     )
 
         partner_ids = set(map(int, this.partner_ids))  # [:2]
