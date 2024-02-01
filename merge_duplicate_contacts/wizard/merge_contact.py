@@ -151,7 +151,7 @@ class MergePartnerAutomatic(models.TransientModel):
         }
 
     def _generate_query(self, fields, maximum_group=100):
-        final_querry = "SELECT min(id), array_agg(id) FROM res_partner "
+        final_query = "SELECT min(id), array_agg(id) FROM res_partner "
 
         email_domains_config_value = (
             self.env["ir.config_parameter"]
@@ -164,10 +164,10 @@ class MergePartnerAutomatic(models.TransientModel):
         else:
             email_domains = []
 
-        # Set up parts of the querries based on selected fields here
+        # Set up parts of the queries based on selected fields here
         # Match case would look better here but isn't a feature in our python version yet
         sql_fields = []
-        where_querries = []
+        where_queries = []
         for field in fields:
             if field in ["email", "name"]:
                 sql_fields.append("lower(%s)" % field)
@@ -179,19 +179,21 @@ class MergePartnerAutomatic(models.TransientModel):
                 sql_fields.append(field)
 
         if email_domains and self.filter_domain_email:
-            formatted_domains = "'" + "', '".join(email_domains) + "'"
-            where_querries.append(
-                f"substring(email from '@(.*)$') not in ({formatted_domains})"
-            )
+            email_domains = list(filter(None, (x.strip() for x in email_domains)))
 
-        # Construct the correct final querry here
-        if where_querries:
-            final_querry += " WHERE " + " AND ".join(where_querries)
+            clause = self.env.cr.mogrify(
+                "substring(email from '@(.*)$') not in %s", (tuple(email_domains),)
+            ).decode()
+            where_queries.append(clause)
+
+        # Construct the correct final query here
+        if where_queries:
+            final_query += " WHERE " + " AND ".join(where_queries)
         if sql_fields:
-            final_querry += " GROUP BY " + ", ".join(sql_fields)
-            final_querry += " HAVING COUNT(*) > 1"
+            final_query += " GROUP BY " + ", ".join(sql_fields)
+            final_query += " HAVING COUNT(*) > 1"
 
-        return final_querry
+        return final_query
 
     def _process_query(self, query, ignore_occurence=True):
         """

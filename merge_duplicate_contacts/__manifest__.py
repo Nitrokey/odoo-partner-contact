@@ -10,6 +10,7 @@
     "depends": ["base", "sale_management"],
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_domain_email.xml",
         "wizard/merge_contact_view.xml",
     ],
 }
