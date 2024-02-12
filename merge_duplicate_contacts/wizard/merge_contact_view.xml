@@ -1000,21 +1000,26 @@
     <record id="merge_partner_manual_check_form_ext" model="ir.ui.view">
         <field name="name">base.partner.merge.automatic.wizard</field>
         <field name="model">base.partner.merge.automatic.wizard</field>
+        <field name="mode">primary</field>
         <field name="inherit_id" ref="base.base_partner_merge_automatic_wizard_form" />
         <field name="arch" type="xml">
-            <field name='exclude_contact' position="after">
+            <field name="exclude_contact" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+            <field name="exclude_journal_item" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+            <field name="exclude_contact" position="after">
                 <field name="associate_contact" />
                 <field name="contact_not_being_customer" />
                 <field name="without_sales_orders" />
+                <field name="filter_domain_email" />
             </field>
-            <field name="group_by_parent_id" position="after">
-                <field name="group_by_domain_email" />
-            </field>
+            <field name="group_by_parent_id" />
             <field name="group_by_name" position="after">
                 <field name="group_by_phone" />
                 <field name="group_by_mobile" />
             </field>
         </field>
     </record>
-
 </odoo>

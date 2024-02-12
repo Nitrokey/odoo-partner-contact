@@ -30,7 +30,7 @@ class ResPartner(models.Model):
             "current_line_id": False,
             "line_ids": [],
             "partner_ids": [],
-            "exclude_contact": True,
+            "exclude_contact": False,
             "maximum_group": 0,
             "total_duplicates": 0,
             "duplicate_position": 0,

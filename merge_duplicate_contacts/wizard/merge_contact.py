@@ -19,7 +19,7 @@ class MergePartnerAutomatic(models.TransientModel):
     )
     without_sales_orders = fields.Boolean(default=True)
 
-    group_by_domain_email = fields.Boolean("Domain Email")
+    filter_domain_email = fields.Boolean("Domain Email")
 
     group_by_phone = fields.Boolean("Phone")
     group_by_mobile = fields.Boolean("Mobile")
@@ -151,71 +151,51 @@ class MergePartnerAutomatic(models.TransientModel):
         }
 
     def _generate_query(self, fields, maximum_group=100):
-        final_querry = "SELECT min(id), array_agg(id) FROM res_partner "
+        final_query = "SELECT min(id), array_agg(id) FROM res_partner "
 
-        where_querries = []
-        group_by_querries = []
-
-        commercial_email_domains = (
-            " ('aikq.de','aol.com','aol.de','arcor.de',"
-            "'bluewin.ch','compuserve.com','dismail.de','disroot.org','duck.com','email.de',"
-            "'ewe.net','ewetel.net','fastmail.com','fastmail.de','fastmail.fm','fastmail.net',"
-            "'free.fr','freenet.de','gmail.com','gmx.at','gmx.ch','gmx.com','gmx.de','gmx.eu',"
-            "'gmx.fr','gmx.info','gmx.li','gmx.org','gmxpro.de','gmx-topmail.de',"
-            "'googlemail.com','hotmail.ch','hotmail.co.uk','hotmail.com','hotmail.de',"
-            "'hotmail.es','hotmail.fr','hotmail.it','hush.com','hushmail.com','icloud.com',"
-            "'jpberlin.de','kabelmail.de','laposte.net','lavabit.com','librem.one',"
-            "'live.co.uk','live.com','live.de','live.fr','live.nl','mac.com','mail.de',"
-            "'mailbox.org','mailfence.com','me.com','meineinkauf.ch','msn.com',"
-            "'mykolab.ch','mykolab.com','netcologne.de','online.de','onlinehome.de',"
-            "'orange.fr','outlook.com','outlook.de','outlook.es','outlook.fr',"
-            "'posteo.at','posteo.ch','posteo.co.uk','posteo.de','posteo.eu',"
-            "'posteo.lu','posteo.net','posteo.org','proton.me','protommail.com',"
-            "'protonmail.ch','pt.lu','riseup.net','runbox.com','secure.mailbox.org',"
-            "'startmail.com','system.li','temp.mailbox.org','t-online.de',"
-            "'tuta.io','tutamail.com','tutanota.com','tutanota.de','vodafone.de',"
-            "'vodafonemail.de','wanadoo.fr','web.de','xs4all.nl','yahoo.ca','yahoo.co.uk',"
-            "'yahoo.com','yahoo.de','yahoo.es','yahoo.fr','yahoo.it')"
-        )
-
-        # Set up parts of the querries based on selected fields here
+        # Set up parts of the queries based on selected fields here
         # Match case would look better here but isn't a feature in our python version yet
+        sql_fields = []
+        where_queries = []
         for field in fields:
-            if field == "email":
-                group_by_querries.append("email")
+            if field in ["email", "name"]:
+                sql_fields.append("lower(%s)" % field)
 
-            if field == "name":
-                group_by_querries.append("name")
+            elif field in ["vat"]:
+                sql_fields.append("replace(%s, ' ', '')" % field)
 
-            if field == "phone":
-                group_by_querries.append("phone")
+            else:
+                sql_fields.append(field)
 
-            if field == "mobile":
-                group_by_querries.append("mobile")
+        if self.filter_domain_email:
+            email_domains_config_value = (
+                self.env["ir.config_parameter"]
+                .sudo()
+                .get_param("merge_duplicate_contacts.email_domains")
+            )
 
-            if field == "is_company":
-                group_by_querries.append("is_company")
+            email_domains = (
+                email_domains_config_value.split(",")
+                if email_domains_config_value
+                else []
+            )
 
-            if field == "vat":
-                group_by_querries.append("vat")
+            if email_domains:
+                email_domains = list(filter(None, (x.strip() for x in email_domains)))
 
-            if field == "parent_id":
-                group_by_querries.append("parent_id")
+                clause = self.env.cr.mogrify(
+                    "substring(email from '@(.*)$') not in %s", (tuple(email_domains),)
+                ).decode()
+                where_queries.append(clause)
 
-            if field == "domain_email":
-                where_querries.append(
-                    "substring(email from '@(.*)$') not in %s"
-                    % commercial_email_domains
-                )
+        # Construct the correct final query here
+        if where_queries:
+            final_query += " WHERE " + " AND ".join(where_queries)
+        if sql_fields:
+            final_query += " GROUP BY " + ", ".join(sql_fields)
+            final_query += " HAVING COUNT(*) > 1"
 
-        # Construct the correct final querry here
-        if where_querries:
-            final_querry += " WHERE " + " AND ".join(where_querries)
-        if group_by_querries:
-            final_querry += " GROUP BY " + ", ".join(group_by_querries)
-            final_querry += " HAVING COUNT(*) > 1"
-
-        return final_querry
+        return final_query
 
     def _process_query(self, query, ignore_occurence=True):
         """
