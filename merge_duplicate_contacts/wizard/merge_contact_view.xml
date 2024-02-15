@@ -903,7 +903,7 @@
                                 name="is_company"
                                 nolabel="1"
                                 class="oe_inline"
-                                style="min-width: 300px;"
+                                style="min-width: 295px;"
                             />
                             <field
                                 name='is_company_show_icon'
@@ -944,7 +944,7 @@
                                 name="is_company2"
                                 nolabel="1"
                                 class="oe_inline"
-                                style="min-width: 300px;"
+                                style="min-width: 200px;"
                             />
                         </div>
                     </group>
