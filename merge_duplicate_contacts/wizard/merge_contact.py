@@ -220,7 +220,7 @@ class MergePartnerAutomatic(models.TransientModel):
             }
             # To ensure that the used partners are accessible by the user
             partners = self.env["res.partner"].search(
-                [("id", "in", aggr_ids), ("email", "!=", False)]
+                [("id", "in", aggr_ids)]
             )
             if len(partners) >= 2:
                 ordered_partners = self._get_ordered_partner(partners.ids)
