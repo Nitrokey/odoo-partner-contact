@@ -379,7 +379,7 @@ class MergePartnerManualCheck(models.TransientModel):
         if partner_ids & child_ids:
             raise UserError(_("You cannot merge a contact with one of his parent."))
 
-        if len({partner.email.lower() for partner in partner_ids}) > 1:
+        if len({(partner.email or "").lower() for partner in partner_ids}) > 1:
             raise UserError(
                 _(
                     "All contacts must have the same email. Only the "
