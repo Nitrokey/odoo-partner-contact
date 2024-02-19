@@ -948,7 +948,7 @@
                             />
                         </div>
                     </group>
-                    <group col="16">
+                    <group col="15">
                         <label colspan="1" for="keep1" style="min-width: 108px;" />
                         <field colspan="5" name="keep1" nolabel="1" />
                         <button
@@ -967,7 +967,7 @@
                             class="fa fa-arrow-right"
                             style="display:none;"
                         />
-                        <field colspan="5" name="keep2" nolabel="1" />
+                        <field colspan="4" name="keep2" nolabel="1" />
                     </group>
                 </sheet>
                 <footer>
