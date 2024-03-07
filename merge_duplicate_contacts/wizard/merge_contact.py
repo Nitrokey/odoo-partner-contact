@@ -167,6 +167,9 @@ class MergePartnerAutomatic(models.TransientModel):
             else:
                 sql_fields.append(field)
 
+        if self.associate_contact:
+            where_queries.append("parent_id NOT IN (SELECT id FROM res_partner WHERE is_company = true))")
+
         if self.filter_domain_email:
             email_domains_config_value = (
                 self.env["ir.config_parameter"]
