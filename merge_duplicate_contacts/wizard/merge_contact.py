@@ -204,7 +204,30 @@ class MergePartnerAutomatic(models.TransientModel):
             )
 
         if self.associate_contact:
-            where_queries.append("parent_id NOT IN (SELECT id FROM res_partner WHERE is_company = true))")
+            where_queries.append(
+                """
+                    parent_id IS NULL
+                    AND
+                    id NOT IN (SELECT parent_id FROM res_partner WHERE parent_id IS NOT NULL)
+                """
+            )
+
+        if self.contact_not_being_customer:
+            where_queries.append("customer_rank > 0")
+
+        if self.without_sales_orders:
+            where_queries.append(
+                """
+                    id NOT IN
+                    (
+                        SELECT partner_id FROM sale_order
+                        UNION
+                        SELECT partner_invoice_id FROM sale_order
+                        UNION
+                        SELECT partner_shipping_id FROM sale_order
+                    )
+                """
+            )
 
         if self.filter_domain_email:
             email_domains_config_value = (
