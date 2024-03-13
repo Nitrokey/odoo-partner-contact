@@ -82,7 +82,7 @@ class MergePartnerManualCheck(models.TransientModel):
     street22 = fields.Char("Address2 2")
 
     zip = fields.Char()
-    zip2 = fields.Char("Zip 2")
+    zip2 = fields.Char("ZIP 2")
 
     city = fields.Char()
     city2 = fields.Char("City 2")
@@ -96,7 +96,7 @@ class MergePartnerManualCheck(models.TransientModel):
     is_company = fields.Boolean("Is Company ?")
     is_company2 = fields.Boolean("Is Company 2 ?")
 
-    vat_1 = fields.Char("Vat")
+    vat_1 = fields.Char("VAT")
     vat_2 = fields.Char()
 
     keep1 = fields.Boolean("Keep", default=True)
