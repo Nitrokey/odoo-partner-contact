@@ -160,15 +160,22 @@ class MergePartnerAutomatic(models.TransientModel):
         for field in fields:
             if field in ["email", "name"]:
                 sql_fields.append("lower(%s)" % field)
-                where_queries.append("%s IS NOT NULL AND TRIM(%s) != ''" % (field, field))
+                where_queries.append(
+                    "%s IS NOT NULL AND TRIM(%s) != ''" % (field, field)
+                )
 
             elif field in ["vat"]:
                 sql_fields.append("replace(%s, ' ', '')" % field)
-                where_queries.append("%s IS NOT NULL AND TRIM(replace(%s, ' ', '')) != ''" % (field, field))
+                where_queries.append(
+                    "%s IS NOT NULL AND TRIM(replace(%s, ' ', '')) != ''"
+                    % (field, field)
+                )
 
             else:
                 sql_fields.append(field)
-                where_queries.append("%s IS NOT NULL AND TRIM(%s) != ''" % (field, field))
+                where_queries.append(
+                    "%s IS NOT NULL AND TRIM(%s) != ''" % (field, field)
+                )
 
         if self.associate_contact:
             where_queries.append(
@@ -197,7 +204,7 @@ class MergePartnerAutomatic(models.TransientModel):
             )
 
         if self.filter_domain_email:
-            email_domains_config_value = a
+            email_domains_config_value = (
                 self.env["ir.config_parameter"]
                 .sudo()
                 .get_param("merge_duplicate_contacts.email_domains")
