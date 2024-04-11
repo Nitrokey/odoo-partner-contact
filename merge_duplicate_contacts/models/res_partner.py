@@ -1,4 +1,5 @@
-from odoo import models
+from odoo import _, models
+from odoo.exceptions import UserError
 
 
 class ResPartner(models.Model):
@@ -40,6 +41,11 @@ class ResPartner(models.Model):
         }
 
     def open_wizard_action(self):
+        if len(self.ids) < 2:
+            raise UserError(
+                _("At least two records are needed to perform this action.")
+            )
+            return
         context = {}
         data = self.prepare_wizard_data()
         wizard = self.env["base.partner.merge.automatic.wizard"].create(data)
