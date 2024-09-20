@@ -341,259 +341,46 @@ class MergePartnerManualCheck(models.TransientModel):
         )
         return self.partner_wizard_id._action_new_next_screen()
 
-    def _get_ordered_partner(self, partner_ids, context=None):
-        partners = self.pool.get("res.partner").browse(
-            list(partner_ids), context=context
-        )
-        ordered_partners = sorted(
-            sorted(partners, key=operator.attrgetter("create_date"), reverse=True),
-            key=operator.attrgetter("active"),
-            reverse=True,
-        )
-        return ordered_partners
-
-    def _merge(self, partner_ids, dst_partner=None, context=None):
-        # super-admin can be used to bypass extra checks
-        if self.env.user._is_admin():
-            pass
-
-        Partner = self.env["res.partner"]
-        partner_ids = Partner.browse(partner_ids).exists()
-        if len(partner_ids) < 2:
-            return
-        if len(partner_ids) > 3:
-            raise UserError(
-                _(
-                    "For safety reasons, you cannot merge more"
-                    " than 3 contacts together. You can re-open the wizard "
-                    "several times if needed."
-                )
-            )
-
-        # check if the list of partners to merge contains child/parent relation
-        child_ids = self.env["res.partner"]
-        for partner_id in partner_ids:
-            child_ids |= (
-                Partner.search([("id", "child_of", [partner_id.id])]) - partner_id
-            )
-        if partner_ids & child_ids:
-            raise UserError(_("You cannot merge a contact with one of his parent."))
-
-        if len({(partner.email or "").lower() for partner in partner_ids}) > 1:
-            raise UserError(
-                _(
-                    "All contacts must have the same email. Only the "
-                    "Administrator can merge contacts with different emails."
-                )
-            )
-
-        # remove dst_partner from partners to merge
-        if dst_partner and dst_partner in partner_ids:
-            src_partners = partner_ids - dst_partner
-        else:
-            ordered_partners = self._get_ordered_partner(partner_ids.ids)
-            dst_partner = ordered_partners[-1]
-            src_partners = ordered_partners[:-1]
-        _logger.info("dst_partner: %s", dst_partner.id)
-
-        # Make the company of all related users consistent
-        if dst_partner.company_id:
-            for user in partner_ids.mapped("user_ids"):
-                user.sudo().write(
-                    {
-                        "company_ids": [(6, 0, [dst_partner.company_id.id])],
-                        "company_id": dst_partner.company_id.id,
-                    }
-                )
-
-        # call sub methods to do the merge
-        self._update_foreign_keys(src_partners, dst_partner)
-        self._update_reference_fields(src_partners, dst_partner)
-        self._update_values(src_partners, dst_partner)
-
-        self._log_merge_operation(src_partners, dst_partner)
-
-        for partner in src_partners:
-            partner.unlink()
-
-    # delete source partner, since they are merged
-    def _log_merge_operation(self, src_partners, dst_partner):
-        _logger.info(
-            "(uid = %s) merged the partners %r with %s",
-            self._uid,
-            src_partners.ids,
-            dst_partner.id,
-        )
-
-    def _update_foreign_keys(self, src_partners, dst_partner, context=None):
-        res = self.env["base.partner.merge.automatic.wizard"]._update_foreign_keys(
-            src_partners, dst_partner
-        )
-        return res
-
-    def _update_reference_fields(self, src_partners, dst_partner, context=None):
-        res = self.env["base.partner.merge.automatic.wizard"]._update_reference_fields(
-            src_partners, dst_partner
-        )
-        return res
-
-    @api.model
-    def _update_values(self, src_partners, dst_partner):
-        _logger.debug(
-            "_update_values for dst_partner: %s for src_partners: %r",
-            dst_partner.id,
-            src_partners.ids,
-        )
-
-        model_fields = dst_partner.fields_get().keys()
-
-        def write_serializer(item):
-            if isinstance(item, models.BaseModel):
-                return item.id
-            else:
-                return item
-
-        # get all fields that are not computed or x2many
-        values = dict()
-
-        form_fields = [
-            "name",
-            "email",
-            "phone",
-            "street",
-            "street2",
-            "zip",
-            "city",
-            "state_id",
-            "country_id",
-            "is_company",
-            "vat",
-        ]
-        for column in model_fields:
-            field = dst_partner._fields[column]
-            if (
-                field.type not in ("many2many", "one2many")
-                and field.compute is None
-                and column not in form_fields
-            ):
-                for item in itertools.chain(src_partners, [dst_partner]):
-                    if item[column]:
-                        values[column] = write_serializer(item[column])
-
-        # remove fields that can not be updated (id and parent_id)
-        values.pop("id", None)
-        parent_id = values.pop("parent_id", None)
-        if dst_partner.child_ids and "is_company" not in values:
-            values.update({"is_company": dst_partner.is_company})
-        dst_partner.write(values)
-        # try to update the parent_id
-        if parent_id and parent_id != dst_partner.id:
-            try:
-                dst_partner.write({"parent_id": parent_id})
-            except ValidationError:
-                _logger.info(
-                    "Skip recursive partner hierarchies for parent_id %s of partner: %s",
-                    parent_id,
-                    dst_partner.id,
-                )
-
     def action_merge(self, context=None):
-        context = dict(context or {}, active_test=False)
-        this = self
-        if this.keep1 is False and this.keep2 is False:
+        if self.keep1 is False and self.keep2 is False:
             raise Warning(_("Please select a contact to keep."))
-        if this.keep1:
-            this.dst_partner_id = this.partner_ids and this.partner_ids[0].id or False
-            if this.dst_partner_id:
-                this.dst_partner_id.write(
-                    {
-                        "parent_id": this.company_id and this.company_id.id or False,
-                        "company_name": this.company_name or False,
-                        "name": this.name or False,
-                        "email": this.email or False,
-                        "phone": this.phone or False,
-                        "mobile": this.mobile or False,
-                        "street": this.street or False,
-                        "street2": this.street11 or False,
-                        "zip": this.zip or False,
-                        "city": this.city or False,
-                        "state_id": this.state_id and this.state_id.id or False,
-                        "country_id": this.country_id and this.country_id.id or False,
-                        "is_company": this.is_company2 or False,
-                        "vat": this.vat_1 or False,
-                    }
-                )
-                # To Avoid VAT Validation, updated it using query.
-                if this.vat_1:
-                    self._cr.execute(
-                        """
-                        UPDATE res_partner SET vat = %s WHERE id = %s
-                        """,
-                        (this.vat_1, this.dst_partner_id.id),
-                    )
-        else:
-            this.dst_partner_id = this.partner_ids and this.partner_ids[1].id or False
-            if this.dst_partner_id:
-                this.dst_partner_id.write(
-                    {
-                        "parent_id": this.company_id2 and this.company_id2.id or False,
-                        "company_name": this.company_name2 or False,
-                        "name": this.name2 or False,
-                        "email": this.email2 or False,
-                        "phone": this.phone2 or False,
-                        "mobile": this.mobile2 or False,
-                        "street": this.street2 or False,
-                        "street2": this.street22 or False,
-                        "zip": this.zip2 or False,
-                        "city": this.city2 or False,
-                        "state_id": this.state_id2 and this.state_id2.id or False,
-                        "country_id": this.country_id2 and this.country_id2.id or False,
-                        "is_company": this.is_company2 or False,
-                        "vat": this.vat_2 or False,
-                    }
-                )
-
-                # To Avoid VAT Validation, updated it using query.
-                if this.vat_2:
-                    self._cr.execute(
-                        """
-                        UPDATE res_partner SET vat = %s WHERE id = %s
-                        """,
-                        (this.vat_2, this.dst_partner_id.id),
-                    )
-
-        partner_ids = set(map(int, this.partner_ids))  # [:2]
-        #         custom_partner_ids = set(map(int, this.custom_partner_ids))
-        if not partner_ids:
-            this.write({"state": "finished"})
+        if not self.partner_ids:
+            self.write({"state": "finished"})
             return {
                 "type": "ir.actions.act_window",
-                "res_model": this._name,
-                "res_id": this.id,
+                "res_model": self._name,
+                "res_id": self.id,
                 "view_mode": "form",
                 "target": "new",
             }
 
-        self._merge(partner_ids, this.dst_partner_id, context=context)
+        if self.keep1:
+            self.dst_partner_id = self.partner_ids[0]
+        else:
+            self.dst_partner_id = self.partner_ids[1]
 
-        if this.partner_wizard_id.current_line_id:
-            deleted_partner_ids = list(set(partner_ids) - {this.dst_partner_id.id})
+        partner_ids = self.partner_ids.ids
+        # TODO is the usage of extra_checks = False correct here?
+        self.env["base.partner.merge.automatic.wizard"]._merge(partner_ids, self.dst_partner_id, extra_checks = False)
+
+        if self.partner_wizard_id.current_line_id:
+            deleted_partner_ids = list(set(partner_ids) - {self.dst_partner_id.id})
             new_aggr_ids = list(
-                set(literal_eval(this.partner_wizard_id.current_line_id.aggr_ids))
+                set(literal_eval(self.partner_wizard_id.current_line_id.aggr_ids))
                 - set(deleted_partner_ids)
             )
             if not new_aggr_ids or len(new_aggr_ids) == 1:
-                this.partner_wizard_id.current_line_id.unlink()
+                self.partner_wizard_id.current_line_id.unlink()
             else:
-                this.partner_wizard_id.current_line_id.write({"aggr_ids": new_aggr_ids})
+                self.partner_wizard_id.current_line_id.write({"aggr_ids": new_aggr_ids})
 
-        this.partner_wizard_id.write(
+        self.partner_wizard_id.write(
             {
-                "duplicate_position": this.partner_wizard_id.duplicate_position + 1,
+                "duplicate_position": self.partner_wizard_id.duplicate_position + 1,
             }
         )
 
-        return this.partner_wizard_id._action_new_next_screen()
+        return self.partner_wizard_id._action_new_next_screen()
 
     def swap_to_left(self):
         context = self._context.get("field_name")
