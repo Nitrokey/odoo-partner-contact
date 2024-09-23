@@ -45,7 +45,6 @@ class ResPartner(models.Model):
             raise UserError(
                 _("At least two records are needed to perform this action.")
             )
-            return
         context = {}
         data = self.prepare_wizard_data()
         wizard = self.env["base.partner.merge.automatic.wizard"].create(data)
