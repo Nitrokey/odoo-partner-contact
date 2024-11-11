@@ -192,7 +192,7 @@ class MergePartnerAutomatic(models.TransientModel):
         if self.without_sales_orders:
             where_queries.append(
                 """
-                    id NOT IN
+                    id IN
                     (
                         SELECT partner_id FROM sale_order
                         UNION
