@@ -352,70 +352,6 @@ class MergePartnerManualCheck(models.TransientModel):
         )
         return ordered_partners
 
-    def _merge(self, partner_ids, dst_partner=None, context=None):
-        # super-admin can be used to bypass extra checks
-        if self.env.user._is_admin():
-            pass
-
-        Partner = self.env["res.partner"]
-        partner_ids = Partner.browse(partner_ids).exists()
-        if len(partner_ids) < 2:
-            return
-        if len(partner_ids) > 3:
-            raise UserError(
-                _(
-                    "For safety reasons, you cannot merge more"
-                    " than 3 contacts together. You can re-open the wizard "
-                    "several times if needed."
-                )
-            )
-
-        # check if the list of partners to merge contains child/parent relation
-        child_ids = self.env["res.partner"]
-        for partner_id in partner_ids:
-            child_ids |= (
-                Partner.search([("id", "child_of", [partner_id.id])]) - partner_id
-            )
-        if partner_ids & child_ids:
-            raise UserError(_("You cannot merge a contact with one of his parent."))
-
-        if len({(partner.email or "").lower() for partner in partner_ids}) > 1:
-            raise UserError(
-                _(
-                    "All contacts must have the same email. Only the "
-                    "Administrator can merge contacts with different emails."
-                )
-            )
-
-        # remove dst_partner from partners to merge
-        if dst_partner and dst_partner in partner_ids:
-            src_partners = partner_ids - dst_partner
-        else:
-            ordered_partners = self._get_ordered_partner(partner_ids.ids)
-            dst_partner = ordered_partners[-1]
-            src_partners = ordered_partners[:-1]
-        _logger.info("dst_partner: %s", dst_partner.id)
-
-        # Make the company of all related users consistent
-        if dst_partner.company_id:
-            for user in partner_ids.mapped("user_ids"):
-                user.sudo().write(
-                    {
-                        "company_ids": [(6, 0, [dst_partner.company_id.id])],
-                        "company_id": dst_partner.company_id.id,
-                    }
-                )
-
-        # call sub methods to do the merge
-        self._update_foreign_keys(src_partners, dst_partner)
-        self._update_reference_fields(src_partners, dst_partner)
-        self._update_values(src_partners, dst_partner)
-
-        self._log_merge_operation(src_partners, dst_partner)
-
-        for partner in src_partners:
-            partner.unlink()
-
     # delete source partner, since they are merged
     def _log_merge_operation(self, src_partners, dst_partner):
         _logger.info(
@@ -574,7 +510,9 @@ class MergePartnerManualCheck(models.TransientModel):
                 "target": "new",
             }
 
-        self._merge(partner_ids, this.dst_partner_id, context=context)
+        self.env['base.partner.merge.automatic.wizard']._merge(
+            partner_ids, this.dst_partner_id
+        )
 
         if this.partner_wizard_id.current_line_id:
             deleted_partner_ids = list(set(partner_ids) - {this.dst_partner_id.id})
